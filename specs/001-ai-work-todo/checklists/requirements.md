@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,9 +32,9 @@
 ## Notes
 
 - 검증 1회차: SC-008의 화면 폭 수치(px)를 사용자 관점 표현으로 바꿈. 나머지 항목은 통과.
-- [NEEDS CLARIFICATION] 3개가 의도적으로 남아 있음(제품 결정 사항, 템플릿 한도 3개 준수):
-  - FR-017: 미팅 기록 관련 AI 기능 범위
-  - FR-027: 개인용 vs 팀 공유 범위
-  - FR-028: 오프라인 사용 범위
-- 위 3개가 결정되면 `/speckit-clarify`로 스펙에 반영한 뒤 `/speckit-plan`으로 진행한다.
+- 검증 2회차(2026-10-23): [NEEDS CLARIFICATION] 3개를 결정 사항으로 교체하고 스펙의 Clarifications 섹션에 기록함. 모든 항목 통과.
+  - FR-017: AI는 할 일 정리·오늘 계획만. 미팅 기록은 직접 작성(AI 스탠드업 초안, 액션 아이템 자동 추출 없음). User Story 4·5, FR-014 문구 조정.
+  - FR-027: 1인 개인용, 공유·팀 워크스페이스 없음. Assumptions 문구 조정.
+  - FR-028: 오프라인에서는 마지막으로 불러온 내용을 읽기 전용으로만 봄. User Story 6 시나리오 4·5, Edge Cases 2개, SC-011 추가.
+- 다음 단계는 `/speckit-plan`.
 - 알림, 외부 연동, 로그인 방식, 데이터 보관, 앱 스토어 배포 여부는 Assumptions에 기본값으로 기록함(확인 권장).
