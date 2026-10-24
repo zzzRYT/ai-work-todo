@@ -17,7 +17,7 @@ PC·휴대폰 브라우저에서 같은 계정으로 쓰고 홈 화면에 추가
 **기술 접근(제안)**: 캡틴 1명 전용이며, React + TypeScript + Vite로 만든 **PWA**가 **Supabase**(Postgres + RLS + Auth)를 직접 사용하고,
 AI 호출은 **Supabase Edge Function 한 곳**에서만 수행한다(키·프롬프트·쿼터·검증이 서버에 있음). AI는 구조화된 JSON을 **제안**으로만 돌려주고,
 사용자가 확정하면 **원자적 RPC**가 할 일을 만든다. 목록(오늘/내일/백로그/밀린 일)은 저장하지 않고 `plan_date` 하나에서 **읽을 때 계산**해서 자정 배치 작업이 없다.
-정적 파일은 캡틴 도메인의 서브도메인(`<sub>.jinjinstar.<tld>`)으로 Cloudflare Pages 에서 서비스하고, 백엔드는 Supabase 무료 플랜으로 시작한다. AI 는 캡틴의 Anthropic 키(월 $100 크레딧)로 **Sonnet 5.5**를 기본 사용하며 평소 월 약 $5, **앱 월 상한 $20**으로 막는다.
+정적 파일은 캡틴 도메인의 서브도메인(`<sub>.jinjinstar.com`)으로 Cloudflare Pages 에서 서비스하고, 백엔드는 Supabase 무료 플랜으로 시작한다. AI 는 캡틴의 Anthropic 키(월 $100 크레딧)로 **Sonnet 5.5**를 기본 사용하며 평소 월 약 $5, **앱 월 상한 $20**으로 막는다.
 
 ## Technical Context
 
@@ -46,12 +46,12 @@ PR 후 캡틴이 정해 준 내용이다. **스펙 요구사항은 바꾸지 않
 | 주제 | 이전 제안 | 확정/변경 | 계획에 미친 영향 |
 |------|-----------|-----------|------------------|
 | 사용자 범위 | 갭 1: 소유자 전용인지 불명확(임시로 "가입 닫음") | **캡틴 1명 전용** (갭 1 해소) | 가입·초대·공유·사용자별 쿼터 설정을 만들지 않음. 한도·월 예산은 앱 전체 하나로 계산. **RLS 와 정식 인증은 유지**(공개 인터넷 엔드포인트) |
-| 주소 | 미정(Cloudflare Pages 기본 주소) | **캡틴 도메인 `jinjinstar` 의 서브도메인** `<sub>.jinjinstar.<tld>` (TLD·라벨은 자리표시자) | [deployment.md](./deployment.md): CNAME 1개, HTTPS, 인증 리다이렉트 URL, PWA scope/manifest, CORS/CSP, `*.pages.dev` 차단. 호스트가 PWA 설치·저장소·세션의 출처이므로 한 번 정하면 유지 |
+| 주소 | 미정(Cloudflare Pages 기본 주소) | **캡틴 도메인 `jinjinstar.com` 의 서브도메인** `<sub>.jinjinstar.com` (라벨 `<sub>` 만 자리표시자) | [deployment.md](./deployment.md): CNAME 1개, HTTPS, 인증 리다이렉트 URL, PWA scope/manifest, CORS/CSP, `*.pages.dev` 차단. 호스트가 PWA 설치·저장소·세션의 출처이므로 한 번 정하면 유지 |
 | AI 키·예산 | 서버 키 가정, Haiku 5.5 기본, 일 30회, 월 약 $1~2 | **캡틴 본인의 Anthropic 키, 월 $100 크레딧** (Max 구독 크레딧으로 보도됨 — 공식 확인은 캡틴 몫) | 기본 모델을 **Sonnet 5.5**로 상향(Haiku 는 환경 변수로 교체), 일 40회, **앱 월 상한 $20 + Console 워크스페이스 한도 $30 + 조직 한도 $50**, 키는 Supabase 비밀값에만 보관 |
 | 인증 방식 | 매직링크 | 이메일 **코드(OTP)** 입력 기본, 가입 끔 | 설치된 PWA 와 브라우저의 세션 분리 문제를 피함. Supabase 기본 메일은 시간당 2통 제한 → 불편하면 SMTP/Google |
 | 동의 고지 | 버전 관리 동의 | 단일 사용자용으로 가볍게: 첫 사용 1회 확인 + 고지 버전 | 스펙 Assumptions 의 "처음 사용 시 알림"은 그대로 충족 |
 
-**남은 확인** (캡틴): 서브도메인 라벨과 TLD, DNS 호스팅 위치, 크레딧 실제 조건(잔액·이월 없음·소진 후 동작), 크레딧 키가 상업용 API 데이터 처리 경로인지, 회사 정책상 업무 정보를 외부 AI 로 보내도 되는지. 전체 목록은 [아래 표](#캡틴이-확인할-기술-선택).
+**남은 확인** (캡틴): 서브도메인 라벨 `<sub>`, DNS 호스팅 위치, 크레딧 실제 조건(잔액·이월 없음·소진 후 동작), 크레딧 키가 상업용 API 데이터 처리 경로인지, 회사 정책상 업무 정보를 외부 AI 로 보내도 되는지. 전체 목록은 [아래 표](#캡틴이-확인할-기술-선택).
 
 ## Constitution Check
 
@@ -82,7 +82,7 @@ PR 후 캡틴이 정해 준 내용이다. **스펙 요구사항은 바꾸지 않
         ▲ 정적 호스팅                    └───────────────────────────┼──────────────┘
         │                                  키(서버 비밀값)·프롬프트·쿼터·월 예산 │ 구조화 출력(JSON)
   Cloudflare Pages                                                  ▼
-  https://<sub>.jinjinstar.<tld>                      AI 제공자 (Anthropic Messages API)
+  https://<sub>.jinjinstar.com                      AI 제공자 (Anthropic Messages API)
   (커스텀 서브도메인, 상세: deployment.md)
 ```
 
@@ -238,7 +238,7 @@ supabase/
 | D5 | AI 모델·예산 | **Sonnet 5.5 기본**(Haiku 5.5로 교체 가능), 본인 키, 앱 월 상한 $20 | Haiku 5.5 기본, Gemini 유료, OpenAI | 비용을 더 줄이고 싶거나 Haiku 로 충분하다면 |
 | D6 | 인증 | 1인 전용, 가입 끔, 이메일 코드(OTP) | 비밀번호, Google 로그인, 앞단 인증 | 이메일 시간당 2통 제한이 불편하면 SMTP/Google |
 | D7 | 배포·도메인 | Cloudflare Pages + 서브도메인(CNAME) + Supabase | Vercel / Netlify | 이미 쓰는 호스팅이 있다면 |
-| 확인 | 서브도메인 라벨·TLD, DNS 위치 | 자리표시자 `<sub>.jinjinstar.<tld>` | — | **캡틴이 정해야 함** ([할 일 목록](./deployment.md#7-캡틴이-dns계정-쪽에서-해야-할-일-순서대로)) |
+| 확인 | 서브도메인 라벨 `<sub>`, DNS 위치 | `<sub>.jinjinstar.com` (도메인 확정, 라벨만 자리표시자; 루트·기존 레코드는 변경 없음) | — | **캡틴이 정해야 함** ([할 일 목록](./deployment.md#7-캡틴이-dns계정-쪽에서-해야-할-일-순서대로)) |
 | 확인 | 크레딧 조건·키의 데이터 처리 | 월 $100, 이월 없음, 상업용 API 경로로 가정 | — | **캡틴이 Console 에서 확인** |
 | D8 | 오프라인 | 서비스 워커 + 쿼리 캐시 IndexedDB (읽기 전용) | local-first 동기화 엔진 | 오프라인 편집을 원하게 되면 |
 | D10 | 목록 모델 | `plan_date` 파생 | 상태 열 + 자정 배치 | — |

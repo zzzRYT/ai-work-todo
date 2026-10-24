@@ -3,17 +3,28 @@
 **Plan**: [plan.md](./plan.md) | **Research**: [research.md](./research.md) | **작성일**: 2026-10-24 (후속 결정 반영)
 
 캡틴 결정: 앱은 **캡틴 1명만** 쓰고, 주소는 캡틴 소유 도메인 `jinjinstar` 의 **서브도메인**이며, AI는 캡틴의 Anthropic API 키(월 크레딧)를 쓴다.
-최상위 도메인(TLD)과 서브도메인 라벨은 아직 모르므로 **자리표시자**로 쓴다. 추측하지 않는다.
+도메인은 캡틴 소유의 **`jinjinstar.com`** 으로 확정되었다. 서브도메인 라벨 `<sub>` 는 캡틴이 아직 정하지 않았으므로 **자리표시자**로 두고, 임의로 지어내지 않는다.
 
 | 자리표시자 | 뜻 | 정하는 사람 |
 |-----------|----|-------------|
 | `<sub>` | 서브도메인 라벨 (예: 앱 이름) | 캡틴 |
-| `<tld>` | `jinjinstar.` 뒤의 최상위 도메인 | 캡틴 (이미 가진 도메인) |
-| `<APP_HOST>` | `<sub>.jinjinstar.<tld>` — 앱의 유일한 정식 주소 | — |
+| `<APP_HOST>` | `<sub>.jinjinstar.com` — 앱의 유일한 정식 주소 | — (`<sub>` 만 캡틴이 정하면 됨) |
 | `<pages-project>` | Cloudflare Pages 프로젝트 이름 | 구현 시 정함 |
 | `<ref>` | Supabase 프로젝트 참조 ID (`<ref>.supabase.co`) | Supabase 가 발급 |
 
 > **서브도메인은 한 번 정하면 바꾸지 않는 게 좋다.** PWA 설치와 브라우저 저장소(IndexedDB, 로그인 세션)는 **출처(origin = 호스트 이름)** 에 묶여서, 호스트를 바꾸면 홈 화면에 추가한 앱을 다시 설치하고 다시 로그인해야 한다.
+
+## 0. 루트 도메인 `jinjinstar.com` 은 건드리지 않는다
+
+`jinjinstar.com` 은 캡틴의 도메인이며, 이 앱 때문에 **루트(apex)와 기존 서브도메인, 메일 레코드는 바뀌지 않는다.**
+
+- **추가하는 DNS 레코드는 딱 하나**: 선택한 서브도메인 라벨에 대한 `CNAME <sub> → <pages-project>.pages.dev`. 그 외 레코드의 추가·수정·삭제는 없다.
+- **루트(`jinjinstar.com`, `www` 등)의 `A`/`AAAA`/`CNAME`/`ALIAS`는 그대로** 둔다. 루트를 Cloudflare 로 옮기지 않으며 **네임서버(NS) 변경도 하지 않는다**(서브도메인만 붙일 때는 필요 없음 — [Cloudflare 문서](https://developers.cloudflare.com/pages/configuration/custom-domains/), 2026-10-24; 루트 도메인을 Pages 에 붙일 때만 Cloudflare 네임서버가 필요).
+- **다른 기존 서브도메인의 레코드는 그대로**. `<sub>` 가 이미 존재하는 라벨과 겹치지 않는지 만들기 전에 DNS 목록에서 확인한다(같은 이름에 다른 레코드 유형이 있으면 CNAME 을 만들 수 없거나 기존 서비스를 덮어쓴다).
+- **메일 관련 레코드(`MX`, SPF/DKIM/DMARC 용 `TXT` 등)는 그대로**. 이 앱의 DNS 작업에서 메일 레코드를 만지지 않는다. (선택 사항인 사용자 지정 SMTP 를 나중에 쓰게 되면 그때 별도로 결정하며, 기존 메일 레코드를 바꾸지 않고 서브도메인용 레코드를 추가하는 방식을 먼저 검토한다.)
+- **`CAA` 레코드**: 이미 있는 경우에만 Cloudflare 인증서 발급 기관을 허용하는 레코드를 **추가**해야 할 수 있다(기존 레코드를 지우지 않음). 없으면 아무 작업도 없다.
+- **쿠키/세션 격리**: 앱은 상위 도메인 쿠키(`Domain=.jinjinstar.com`)를 쓰지 않으므로 루트나 다른 서브도메인과 로그인 상태를 공유하지도, 영향을 주지도 않는다.
+- 작업 전에 현재 DNS 레코드 목록을 캡틴이 한 번 내보내거나 캡처해 두면 되돌릴 때 안전하다.
 
 ## 1. 구성
 
@@ -33,7 +44,7 @@ Supabase ──(서버에서만)──▶ Anthropic API   ← API 키는 Supabas
 
 공식 문서 요약 ([Cloudflare Pages: Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/), 2026-10-24 확인):
 
-- 서브도메인은 Pages 프로젝트의 **Custom domains → Set up a domain** 에서 추가하고, DNS 공급자에 `CNAME  <sub>.jinjinstar.<tld>  →  <pages-project>.pages.dev` 를 만든다.
+- 서브도메인은 Pages 프로젝트의 **Custom domains → Set up a domain** 에서 추가하고, DNS 공급자에 `CNAME  <sub>.jinjinstar.com  →  <pages-project>.pages.dev` 를 만든다.
 - **DNS 가 Cloudflare 에 있지 않아도 된다**("사이트가 Cloudflare zone 일 필요 없음"). 이 경우 CNAME 을 직접 만들어야 하고, **Pages 에서 도메인을 먼저 추가하지 않고 CNAME 만 만들면 522 오류**가 난다. DNS 가 Cloudflare 에 있으면 CNAME 이 자동 생성된다.
 - 서브도메인만 쓰므로 **루트(apex) 도메인의 네임서버를 Cloudflare 로 옮길 필요가 없다.** (루트 도메인을 Pages 에 붙이려면 Cloudflare 네임서버가 필요하지만 우리는 해당 없음.)
 - `CAA` 레코드를 쓰고 있다면 Cloudflare 가 인증서를 발급할 수 있게 허용해야 한다(문서에 나온 발급 기관: Let's Encrypt, Google Trust Services 계열, SSL.com — `issue`와 `issuewild` 모두). CAA 가 없으면 아무것도 안 해도 된다.
@@ -55,7 +66,7 @@ Supabase 는 **Site URL**(기본 복귀 주소)과 **Redirect URLs 허용 목록
 - **가입 닫기**: Supabase Auth 설정에서 새 사용자 가입을 끄고, 캡틴 계정은 대시보드에서 직접 초대/생성한다(1인 전용). 이후 일반 가입 경로는 없다.
 - **로그인 방식**: 이메일로 받은 **6자리 코드를 앱에 입력(OTP)** 을 기본으로 제안한다. 매직링크는 휴대폰에서 링크를 누르면 설치된 앱이 아니라 브라우저에서 열려, 앱 쪽 세션이 비어 있을 수 있기 때문이다(iOS 동작은 **미확인**, 실기기 검증 대상).
 - **이메일 발송 한도**: Supabase 기본 메일 서비스는 **시간당 2통**, 그리고 **프로젝트 팀 구성원 주소로만** 보낸다 ([Supabase Docs: SMTP](https://supabase.com/docs/guides/auth/auth-smtp), 2026-10-24 확인). 팀 구성원인 캡틴 1명 용도로는 동작하지만 재시도가 몰리면 막힌다. 불편하면 ① 사용자 지정 SMTP(별도 서비스 필요, 비용·DNS 레코드 추가 가능성) 또는 ② Google 로그인(OAuth)으로 전환한다. 처음에는 기본 메일로 시작하고 세션을 길게 유지(자동 갱신)해 로그인 횟수를 줄인다.
-- 세션은 `localStorage` 에 저장되므로 **상위 도메인 쿠키(`Domain=.jinjinstar.<tld>`)는 쓰지 않는다.** 서브도메인이 서로의 세션을 보지 못하게 한다.
+- 세션은 `localStorage` 에 저장되므로 **상위 도메인 쿠키(`Domain=.jinjinstar.com`)는 쓰지 않는다.** 서브도메인이 서로의 세션을 보지 못하게 한다.
 
 ## 4. PWA 범위와 매니페스트
 
@@ -97,8 +108,8 @@ Supabase 는 **Site URL**(기본 복귀 주소)과 **Redirect URLs 허용 목록
 
 ## 7. 캡틴이 DNS·계정 쪽에서 해야 할 일 (순서대로)
 
-1. **이름 정하기**: `<sub>` 라벨과 `<tld>` 확인 → `<APP_HOST>` 확정 (한 번 정하면 변경 비권장).
-2. **DNS 호스팅 위치 확인**: `jinjinstar.<tld>` 의 DNS 가 Cloudflare 인지, 등록 기관/다른 서비스인지 확인.
+1. **이름 정하기**: `<sub>` 라벨만 정하면 `<APP_HOST>` = `<sub>.jinjinstar.com` 이 확정된다 (한 번 정하면 변경 비권장).
+2. **DNS 호스팅 위치 확인**: `jinjinstar.com` 의 DNS 가 Cloudflare 인지, 등록 기관/다른 서비스인지 확인.
 3. **Cloudflare 계정**에서 Pages 프로젝트 생성(저장소 연결). 루트 도메인을 Cloudflare 로 옮길 필요는 없다.
 4. Pages 프로젝트 **Custom domains → `<APP_HOST>` 추가** (이 순서가 먼저).
 5. DNS 가 Cloudflare 가 아니면 **CNAME 레코드 1개**를 만든다: 이름 `<sub>`(전체 이름 `<APP_HOST>`), 값 `<pages-project>.pages.dev`. DNS 가 Cloudflare 면 자동.

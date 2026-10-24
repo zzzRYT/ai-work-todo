@@ -17,7 +17,7 @@
 | D4 | AI 호출 방식 | **서버(Edge Function)에서만** AI 호출, 키는 서버 비밀값 | 브라우저 직접 호출, BYO 키 |
 | D5 | AI 제공자/모델 | **Anthropic Claude Sonnet 5.5** 기본 (Haiku 5.5로 한 줄 교체 가능), 본인 키·월 $100 크레딧, 앱 월 상한 $20 | Haiku 5.5 기본, Gemini, OpenAI |
 | D6 | 인증 (1인 전용) | **Supabase Auth**, 캡틴 계정 하나, **가입 끔**, 이메일 코드(OTP) 로그인 | 비밀번호, Google, 앞단 인증 |
-| D7 | 배포·도메인 | 정적 SPA는 **Cloudflare Pages** + 커스텀 서브도메인 `<sub>.jinjinstar.<tld>`(CNAME), 백엔드는 Supabase 클라우드 | Vercel Hobby, Netlify, GitHub Pages |
+| D7 | 배포·도메인 | 정적 SPA는 **Cloudflare Pages** + 커스텀 서브도메인 `<sub>.jinjinstar.com`(CNAME), 백엔드는 Supabase 클라우드 | Vercel Hobby, Netlify, GitHub Pages |
 | D8 | 오프라인(읽기 전용) | 서비스 워커(앱 셸) + **TanStack Query 캐시를 IndexedDB에 저장** | 오프라인 우선(local-first) 동기화 엔진 |
 | D9 | 동기화/충돌 | 새로고침·포커스 시 재조회 + 마지막 수정 우선(LWW), 클라이언트 UUID, 소프트 삭제 | 실시간 구독, CRDT |
 | D10 | "오늘/내일" 계산 | 저장은 `plan_date` 하나, 목록은 **읽을 때 계산** | 자정 배치 작업으로 이동 |
@@ -139,7 +139,7 @@
 
 ## D7. 배포와 도메인
 
-> **후속 결정(2026-10-24)**: 주소는 캡틴 소유 도메인 `jinjinstar` 의 서브도메인 `<sub>.jinjinstar.<tld>` (TLD·라벨은 자리표시자). 상세 설계와 캡틴 할 일 목록은 [deployment.md](./deployment.md).
+> **후속 결정(2026-10-24)**: 주소는 캡틴 소유 도메인 `jinjinstar.com` 의 서브도메인 `<sub>.jinjinstar.com` (서브도메인 라벨 `<sub>` 만 자리표시자). 루트 도메인과 다른 레코드는 건드리지 않는다([deployment.md §0](./deployment.md#0-루트-도메인-jinjinstarcom-은-건드리지-않는다)). 상세 설계와 캡틴 할 일 목록은 [deployment.md](./deployment.md).
 
 - **추천**: 정적 SPA 를 **Cloudflare Pages** 에 배포하고 **커스텀 서브도메인**을 CNAME 으로 연결한다. 백엔드는 Supabase 기본 주소. 루트 도메인을 Cloudflare 로 옮길 필요 없음(서브도메인만 쓰는 경우).
 - **근거** ([Cloudflare Pages: Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/), 2026-10-24): DNS 가 Cloudflare 에 없어도 서브도메인에 CNAME(`<sub>` → `<project>.pages.dev`)을 직접 만들면 되며, Pages 에서 도메인을 **먼저 추가**하지 않으면 522 오류. CAA 가 있으면 인증서 발급 기관 허용 필요. `*.pages.dev` 는 기본으로 열려 있어 끄거나 리다이렉트해야 출처가 하나로 유지된다.
