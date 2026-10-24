@@ -1,0 +1,25 @@
+{
+  "$comment": "Model-facing output schema for POST /ai/refine (polish / split one existing task). Empty string means 'no change / no value'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "description", "subtasks", "note"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Improved title in Korean, or an empty string to keep the current title."
+    },
+    "description": {
+      "type": "string",
+      "description": "Improved description, or an empty string to keep the current one."
+    },
+    "subtasks": {
+      "type": "array",
+      "description": "Proposed new sub-steps to add. Empty if the request does not ask for splitting.",
+      "items": { "type": "string" }
+    },
+    "note": {
+      "type": "string",
+      "description": "One short Korean sentence telling the user what was changed or why nothing was. Empty string if not needed."
+    }
+  }
+}

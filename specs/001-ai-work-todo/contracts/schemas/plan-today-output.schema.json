@@ -1,0 +1,31 @@
+{
+  "$comment": "Model-facing output schema for POST /ai/plan-today. The model can only reference tasks by the opaque refs supplied in the request; the server drops any ref that was not supplied.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["picks", "summary"],
+  "properties": {
+    "picks": {
+      "type": "array",
+      "description": "Tasks proposed for today's list, in the suggested working order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "reason"],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "The opaque ref of a task copied exactly from the input (e.g. 't7')."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Very short Korean reason for including this task today (e.g. '마감 내일', '어제 못 끝냄'). Based only on the provided fields."
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "One or two short Korean sentences about the day's shape, mentioning today's meetings by name if provided. Empty string if nothing to add."
+    }
+  }
+}
