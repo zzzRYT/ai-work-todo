@@ -15,9 +15,9 @@
 | D2 | 프론트엔드 | **React + TypeScript + Vite** SPA | Next.js, SvelteKit, Vue |
 | D3 | 백엔드/저장소 | **Supabase** (Postgres + Auth + RLS + Edge Functions) | Firebase, Cloudflare Workers+D1, 자체 호스팅 |
 | D4 | AI 호출 방식 | **서버(Edge Function)에서만** AI 호출, 키는 서버 비밀값 | 브라우저 직접 호출, BYO 키 |
-| D5 | AI 제공자/모델 | **Anthropic Claude Haiku 5.5** (교체 가능한 어댑터) | Sonnet 5.5, Gemini, OpenAI |
-| D6 | 인증 | **Supabase Auth**, 이메일 매직링크 + (선택) Google, **가입 닫기** | 비밀번호, 직접 구현 |
-| D7 | 배포 | 정적 SPA는 **Cloudflare Pages**, 백엔드는 Supabase 클라우드 | Vercel Hobby, Netlify, GitHub Pages |
+| D5 | AI 제공자/모델 | **Anthropic Claude Sonnet 5.5** 기본 (Haiku 5.5로 한 줄 교체 가능), 본인 키·월 $100 크레딧, 앱 월 상한 $20 | Haiku 5.5 기본, Gemini, OpenAI |
+| D6 | 인증 (1인 전용) | **Supabase Auth**, 캡틴 계정 하나, **가입 끔**, 이메일 코드(OTP) 로그인 | 비밀번호, Google, 앞단 인증 |
+| D7 | 배포·도메인 | 정적 SPA는 **Cloudflare Pages** + 커스텀 서브도메인 `<sub>.jinjinstar.<tld>`(CNAME), 백엔드는 Supabase 클라우드 | Vercel Hobby, Netlify, GitHub Pages |
 | D8 | 오프라인(읽기 전용) | 서비스 워커(앱 셸) + **TanStack Query 캐시를 IndexedDB에 저장** | 오프라인 우선(local-first) 동기화 엔진 |
 | D9 | 동기화/충돌 | 새로고침·포커스 시 재조회 + 마지막 수정 우선(LWW), 클라이언트 UUID, 소프트 삭제 | 실시간 구독, CRDT |
 | D10 | "오늘/내일" 계산 | 저장은 `plan_date` 하나, 목록은 **읽을 때 계산** | 자정 배치 작업으로 이동 |
@@ -56,7 +56,7 @@
   - 한 곳에서 인증+DB+서버 함수를 해결 → 운영 대상이 하나.
 - **무료 플랜 수치** ([Supabase Pricing](https://supabase.com/pricing), 2026-10-24 확인): DB 500 MB/프로젝트, 월 활성 사용자 50,000, 송신 5 GB, Edge Function 호출 월 500,000회 포함, **1주 비활동 시 프로젝트 일시정지**, **무료 플랜은 일일 백업 없음**(Pro부터 7일).
   Edge Function 한도 ([Supabase Docs: Limits](https://supabase.com/docs/guides/functions/limits), 2026-10-24 확인): 요청당 CPU 2초(비동기 I/O 제외), 메모리 256 MB, 응답 대기 150초(초과 시 504), 무료 플랜 워커 벽시계 150초.
-- **우리 사용량 대비**: 1인 사용, 할 일 수천 건이어도 수 MB. AI 호출은 하루 수십 회 이하 → 한도에 한참 못 미친다.
+- **우리 사용량 대비**: 캡틴 1명 전용, 할 일 수천 건이어도 수 MB. AI 호출은 하루 수십 회 이하 → 한도에 한참 못 미친다.
 - **리스크와 완화**
   1. **1주 비활동 일시정지**: 평일에 쓰면 문제없지만 휴가 후 첫 접속이 실패할 수 있다. 완화: 설정 화면 안내 + 복구 방법 문서화. 계속 거슬리면 Pro(월 $25, 같은 Pricing 페이지) 전환 또는 대안 D3-C.
   2. **무료 플랜 백업 없음**: 완화: 앱의 JSON 내보내기(FR-030)를 정기 백업 수단으로 안내(예: 월 1회).
@@ -77,37 +77,76 @@
 
 ## D5. AI 제공자와 모델
 
-- **추천**: **Anthropic Claude Haiku 5.5** (`claude-haiku-5-5`)를 기본으로, 모델 이름은 환경 변수로 바꿀 수 있게 한다. 품질이 SC-003(90%)에 못 미치면 **Sonnet 5.5**(`claude-sonnet-5-5`)로 올린다.
-- **가격** ([Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing), 2026-10-24 확인): Haiku 5.5는 프롬프트 10만 토큰 이하 **입력 $0.10 / 출력 $0.50 (백만 토큰당)**, 10만 토큰 초과 시 $0.50 / $2.50. Sonnet 5.5는 $2 / $10. 프롬프트 캐시 읽기 Haiku 5.5 $0.01/MTok.
-  우리 요청은 10만 토큰을 한참 밑돈다.
-- **비용 추정(가정 포함)**
-  - 정리 요청: 입력 약 1.5k 토큰(시스템 프롬프트+원문), 출력 약 0.6k → 약 **$0.0005/회**.
-  - 오늘 계획: 후보 최대 80개 × 약 60 토큰 + 미팅/지시문 → 입력 약 7k, 출력 약 1k → 약 **$0.0012/회**.
-  - 하루 상한 30회를 전부 오늘 계획으로 써도 하루 약 $0.04, **월 최대 약 $1.1**. 한국어 토큰이 영어보다 많이 나오고, 한 기사는 새 토크나이저가 이전 모델 대비 같은 입력에서 약 30% 더 많은 토큰을 낸다고 보도했으므로 ([TechEnclave, 2026-10](https://techenclave.com/news/items/claude-haiku-5-5-launches-with-0-10-input-pricing-for-shorter-prompts), 2차 출처) 여유를 두어도 **월 $2 이내**로 본다. 실제 토큰 수는 구현 후 `ai_requests`에 기록해 확인한다.
-- **구조화 출력**: Messages API가 `output_config.format`에 `type: "json_schema"`로 스키마를 받아 유효한 JSON을 돌려준다. `claude-haiku-5-5` 지원 ([Structured outputs 문서](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), 2026-10-24 확인). 제약: 재귀 스키마, 숫자/문자열 길이 제약, `additionalProperties: false` 외 값은 미지원 → [contracts/schemas](./contracts/schemas/)는 이 부분집합만 쓴다. `stop_reason`이 `refusal`/`max_tokens`면 스키마와 어긋날 수 있어 서버에서 따로 처리한다.
-- **데이터 보관/학습** (개인정보 판단 근거):
-  - Anthropic 상업용(API) 기본 정책: 입력·출력을 백엔드에서 **수신/생성 후 30일 이내 자동 삭제**, 예외(Files API 파일, 별도 계약, 정책 위반 집행, 법적 요구) ([Anthropic Privacy Center](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data), 2026-10-24 확인).
-  - API 문서는 "보관된 데이터는 명시적 허락 없이 모델 학습에 쓰이지 않는다"고 적고 있다 ([API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention), 2026-10-24 확인; 해당 페이지의 문구이며, 약관 전체를 법률 검토한 것은 아님).
-  - Zero Data Retention(ZDR)은 별도 신청·검토가 필요해 개인 프로젝트에는 기대하지 않는다.
+> **후속 결정(2026-10-24)**: AI는 캡틴 본인의 Anthropic API 키를 쓰고, 월 $100 크레딧이 딸려 있다. 아래는 그 예산 기준으로 다시 계산했다.
+
+- **추천**: 기본 모델을 **Claude Sonnet 5.5**(`claude-sonnet-5-5`)로 한다. 한국어 상대 날짜 변환(SC-004 95%)과 원문 근거 지키기(FR-015)가 품질에 민감한데, 예산이 충분해서 더 싼 모델로 아낄 이유가 작다. **Haiku 5.5**(`claude-haiku-5-5`)는 환경 변수 한 줄(`AI_MODEL`)로 바꿀 수 있는 저비용 대안으로 남긴다. 어느 쪽이든 모델 이름은 코드에 박지 않는다.
+- **이전 제안(Haiku 기본)을 바꾼 이유**: 첫 제안은 "무료에 가깝게"가 목표라 Haiku 였다. 크레딧이 있으니 목표가 "품질 우선, 월 지출은 예산의 일부"로 바뀌었다. Sonnet 5.5 의 월 비용은 아래처럼 한 자릿수 달러 수준이라 예산 안에 넉넉히 들어온다. 표본 평가에서 Haiku 도 SC-003/004 를 넘으면 Haiku 로 내려 비용을 1/20로 줄일 수 있다.
+- **가격** ([Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing), 2026-10-24 다시 확인; 백만 토큰당):
+
+  | 모델 | 입력 | 출력 | 비고 |
+  |------|------|------|------|
+  | Sonnet 5.5 | $2 | $10 | 프롬프트 캐시 읽기 $0.10 |
+  | Haiku 5.5 | $0.10 | $0.50 | 프롬프트 10만 토큰 초과 시 $0.50 / $2.50 (우리 요청은 해당 없음) |
+
+- **크레딧 조건** (출처: 2차 보도, 2026-10-24 검색 — Anthropic 공식 도움말은 **확인하지 못함**): Claude **Max** 구독자는 월 API 크레딧을 받는다(Max 5x $100, Max 20x $200로 보도됨; [Justin McKelvey](https://justinmckelvey.com/blog/claude-api-credits), [explainx.ai](https://explainx.ai/blog/anthropic-monthly-api-credits-max-team-plans-claim-guide-2026), [AI Pricing Guru](https://www.aipricing.guru/news/claude-max-team-monthly-api-credits-2026/)). 보도된 조건: Console 조직을 구독 청구 설정에 연결해 받아야 하고, **다 쓰지 못한 크레딧은 이월되지 않으며**, Messages API 호출에 쓸 수 있다. **캡틴이 Console 에서 실제 크레딧 잔액·적용 범위·만료를 직접 확인**하고, 크레딧이 소진되었을 때 요청이 막히는지(청구 수단 등록 여부) 확인해야 한다. 이 계획은 크레딧을 "월 $100, 이월 없음"으로 가정한다.
+- **구조화 출력**: 변경 없음. `output_config.format` 에 `json_schema` ([문서](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), 2026-10-24); `claude-sonnet-5-5` 와 `claude-haiku-5-5` 모두 지원 목록에 있다. 제약(재귀·길이 제약 불가 등)은 [contracts/schemas](./contracts/schemas/)가 지킨다.
+- **요청당 비용 추정** (가정: 한국어 토큰이 영어보다 많음 + 새 토크나이저 여유 약 30%를 반영해 넉넉히 잡음. 실제 값은 구현 후 `ai_requests` 로 확인):
+
+  | 기능 | 입력 토큰 | 출력 토큰 | Sonnet 5.5 | Haiku 5.5 |
+  |------|-----------|-----------|-----------|-----------|
+  | 정리(organize) | 2.0k | 0.8k | 약 $0.012 | 약 $0.0006 |
+  | 다듬기(refine) | 1.5k | 0.6k | 약 $0.009 | 약 $0.0005 |
+  | 오늘 계획(plan-today, 후보 80개) | 9k | 1.3k | 약 $0.031 | 약 $0.0016 |
+
+- **월 비용 시나리오 (Sonnet 5.5)**
+
+  | 시나리오 | 하루 사용 | 하루 비용 | 월(30일) |
+  |----------|-----------|-----------|----------|
+  | 평소 | 정리 6 + 다듬기 2 + 오늘 계획 2 | 약 $0.15 | **약 $4.6** |
+  | 많이 씀 | 정리 30 + 오늘 계획 10 (일일 상한 40회) | 약 $0.67 | 약 $20 |
+  | 최악(상한을 매일 전부 오늘 계획으로) | 오늘 계획 40 | 약 $1.24 | 약 $37 → **월 상한이 막음** |
+
+- **한도(예산 보호선)** — 크레딧 $100 에 비해 한참 낮게, 안쪽부터 바깥쪽 순서로 겹쳐서 건다:
+  1. **일일 요청 상한 40회**(서버, `AI_DAILY_REQUEST_LIMIT`). 이전 제안 30회에서 올렸다: 1인 사용이라 "너무 빡빡해서 불편"이 더 큰 위험이고, 비용은 아래 월 상한이 지킨다.
+  2. **앱 월 상한 $20**(서버, `AI_MONTHLY_BUDGET_USD`): 서버가 `ai_requests` 에 기록한 토큰 수 × 가격 환경 변수로 이번 달 지출을 계산해, 넘으면 AI 만 `monthly_budget_exceeded` 로 막는다(할 일·미팅 기능은 정상). 크레딧의 20%.
+  3. **Console 워크스페이스 지출 한도 $30**: 앱 전용 워크스페이스에 건다. 앱 버그로 서버 계산이 틀려도 제공자 쪽에서 막는다. (기본 워크스페이스에는 지출 한도를 못 걸기 때문에 전용 워크스페이스를 쓴다 — [Rate limits 문서](https://platform.claude.com/docs/en/api/rate-limits), 2026-10-24.) 한도에 닿으면 HTTP 400(`invalid_request_error`, "You have reached your specified … API usage limits")이 오고, 조직 등급의 월 상한(Start 등급 $500)에 닿으면 429 `enforced_spend_limit_reached` 가 온다. 서버는 둘 다 `provider_budget_exhausted` 로 매핑한다.
+  4. **조직 지출 한도 $50**: Console Billing 페이지에서 설정(등급 상한을 넘을 수 없음).
+  5. 크레딧 $100 (이월 없음).
+  - 입력 4,000자, 후보 80개, `max_tokens` 고정, 재시도 1회, 멱등 키는 그대로.
+  - 앱 설정에 "이번 달 AI 사용량(예산 대비 %)"을 표시하고 50%·80% 에서 안내한다.
+- **키 취급**: 키는 서버 비밀값으로만 존재한다 — 저장소/로그/브라우저/PR 에 두지 않고 채팅에 붙여 넣지도 않는다. 보관 위치와 점검 방법은 [deployment.md §6](./deployment.md#6-비밀값-anthropic-api-키).
+- **데이터 보관/학습** (개인정보 판단 근거, 변경 없음):
+  - Anthropic 상업용(API) 기본: 입력·출력을 **수신/생성 후 30일 이내 자동 삭제**, 예외(Files API, 별도 계약, 정책 위반 집행, 법적 요구) ([Privacy Center](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data), 2026-10-24).
+  - API 문서: "보관된 데이터는 명시적 허락 없이 모델 학습에 쓰이지 않는다" ([API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention), 2026-10-24; 해당 문구이며 약관 전체의 법률 검토는 아님).
+  - ZDR 은 별도 신청·검토 필요 → 기대하지 않는다.
+  - **구독 크레딧으로 쓰는 API 키도 API 약관(상업용) 경로로 처리되는지**는 공식 확인을 하지 못했다 → 캡틴이 Console 의 개인정보/데이터 보관 설정에서 확인(미확인).
 - **대안**
-  - **Gemini 무료 티어**: 비용 0이 매력적이지만, 약관상 **무료(Unpaid) 서비스는 제출한 내용과 응답이 Google 제품·머신러닝 개선에 쓰이고 사람이 읽을 수 있으며 "민감/기밀/개인 정보를 제출하지 말라"고 경고**한다. 반면 유료(Paid)는 프롬프트를 제품 개선에 쓰지 않는다 ([Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms), 2026-10-24 확인). 회사 업무 정보를 보내는 앱이므로 **무료 티어는 부적합**. 유료 티어는 선택지로 남는다.
-  - OpenAI 등 다른 제공자: 이번에 가격·약관을 조사하지 않았다(**미확인**). 어댑터 한 파일만 바꾸면 되도록 제공자 호출을 분리해 둔다.
-  - 로컬/온디바이스 모델: 휴대폰 지원·품질 문제로 첫 버전 범위 밖.
+  - **Gemini 무료 티어**: 약관상 무료(Unpaid) 서비스는 입력이 제품 개선과 사람 검토에 쓰일 수 있고 "민감/기밀/개인 정보를 제출하지 말라"고 경고. 유료(Paid)는 프롬프트를 제품 개선에 쓰지 않는다 ([Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms), 2026-10-24). 크레딧이 있으니 이제 비교 이점도 없다 → 제외.
+  - **OpenAI 등**: 조사 안 함(미확인). 제공자 호출은 어댑터 한 파일로 분리해 둔다.
+  - **Opus/Fable 계열**: 이 작업(짧은 정리·분류)에는 과하고 비용만 크다 → 제외.
+  - 로컬/온디바이스 모델: 휴대폰 품질·지원 문제로 범위 밖.
 
 ## D6. 인증
 
-- **추천**: Supabase Auth, 첫 버전은 **이메일 매직링크(OTP)**; Google 로그인은 선택 옵션. **공개 가입은 닫고** 소유자 계정만 만든다(Supabase의 가입 허용 설정을 끔).
-- **이유**: 스펙 Assumptions "표준 인증". 비밀번호를 직접 저장·재설정할 필요가 없다. 가입을 닫는 이유는 **AI 호출 비용 노출 방지** — 서버 키로 AI를 쓰므로 아무나 가입하면 내 비용이 나간다.
-- **대안**: 이메일+비밀번호(재설정/유출 대응 부담), 직접 구현(보안 부담).
-- **캡틴 확인 필요**: FR-026/FR-027이 "소유자 1명만 쓰는 앱"인지 "각자 자기 데이터만 보는 서비스"인지 문구만으로는 모호하다. 데이터 모델은 사용자별 RLS라 둘 다 지원하지만, 가입 정책(닫음/초대제/공개)과 사용자별 AI 쿼터는 달라진다. 추천은 **가입 닫음**.
-- **오프라인 주의**: 오프라인에서는 토큰 갱신이 안 되므로, 만료된 세션 때문에 읽기 전용 화면이 로그아웃으로 튕기지 않게 해야 한다(quickstart 시나리오 7). 로그아웃 시에는 기기에 캐시된 데이터를 지운다(공용 PC 보호).
+> **후속 결정(2026-10-24)**: 앱은 캡틴 1명 전용이다(스펙 갭 1 해소). 다중 사용자용 경로는 만들지 않는다.
 
-## D7. 배포
+- **추천**: Supabase Auth 로 **캡틴 계정 하나**만 만들고 **새 가입은 끈다**. 로그인은 이메일로 받은 **6자리 코드 입력(OTP)** 을 기본으로 한다(매직링크는 휴대폰에서 설치된 앱과 브라우저 세션이 갈릴 수 있음 — 미확인, 실기기 검증). 선택 옵션: Google 로그인.
+- **단순화한 것**: 가입 화면·초대 흐름·팀/공유 경로·사용자별 쿼터 설정은 두지 않는다. AI 한도와 월 예산은 "계정별"이 아니라 앱 전체 하나(= 캡틴 하나)로 센다. 동의 고지는 스펙 Assumptions 가 요구하므로 남기되 단일 사용자용으로 가볍게(첫 사용 1회 확인 + 고지 버전).
+- **그대로 둔 것(공개 인터넷 엔드포인트이므로)**: 모든 테이블의 **RLS(`user_id = auth.uid()`)**, JWT 로 보호되는 Edge Function, CORS 를 앱 주소 한 곳으로 제한, 서버 측 쿼터·월 예산, 계정 삭제 시 재확인(FR-030). 1명이라도 DB 와 함수는 인터넷에서 닿는 주소이고, 가입을 닫아도 anon 키는 브라우저에 있으므로 RLS 가 방어선이다.
+- **이메일 한도 주의**: Supabase 기본 메일은 **시간당 2통**이고 프로젝트 팀 구성원 주소에만 보낸다 ([Supabase Docs: SMTP](https://supabase.com/docs/guides/auth/auth-smtp), 2026-10-24). 캡틴 1명이면 동작하지만 빡빡하다 → 세션을 길게 유지, 불편하면 사용자 지정 SMTP 또는 Google 로그인. 자세한 설정은 [deployment.md §3](./deployment.md#3-인증-리다이렉트-url-supabase-auth).
+- **대안**: 이메일+비밀번호(재설정/유출 대응 부담), 직접 구현(보안 부담), Cloudflare Access 등 앞단 인증(앱과 별개 서비스 설정이 늘어남).
+- **오프라인 주의**: 오프라인에서는 토큰 갱신이 안 되므로 만료된 세션 때문에 읽기 전용 화면이 로그아웃으로 튕기지 않게 한다. 로그아웃 시 기기 캐시를 지운다.
 
-- **추천**: 정적 SPA를 **Cloudflare Pages**에 배포(Git 연동 자동 빌드), 백엔드는 Supabase 클라우드. 환경별 분리는 Supabase 프로젝트 1개(운영) + 로컬 Supabase(개발)로 시작.
-- **한도** ([Cloudflare Pages Limits](https://developers.cloudflare.com/pages/platform/limits/), 2026-10-24 확인): 무료 플랜 빌드 월 500회, 사이트당 파일 20,000개, 파일 하나 25 MiB. 해당 페이지에는 대역폭·정적 요청 한도 언급이 없다(제3자 글은 "정적 자산 무제한"이라 하나 공식 확인은 못 함).
-- **대안**: Vercel Hobby(개인 용도 무료지만 약관/한도는 이번에 **미확인**), Netlify, GitHub Pages(빌드 파이프라인이 단순하지만 SPA 라우팅/헤더 설정이 제한적). 정적 파일만 올리므로 어느 쪽이든 이전 비용이 낮다.
-- **CI**: GitHub Actions(타입체크·린트·단위·RLS 테스트)는 PR마다. 배포는 Pages의 Git 연동에 맡긴다.
+## D7. 배포와 도메인
+
+> **후속 결정(2026-10-24)**: 주소는 캡틴 소유 도메인 `jinjinstar` 의 서브도메인 `<sub>.jinjinstar.<tld>` (TLD·라벨은 자리표시자). 상세 설계와 캡틴 할 일 목록은 [deployment.md](./deployment.md).
+
+- **추천**: 정적 SPA 를 **Cloudflare Pages** 에 배포하고 **커스텀 서브도메인**을 CNAME 으로 연결한다. 백엔드는 Supabase 기본 주소. 루트 도메인을 Cloudflare 로 옮길 필요 없음(서브도메인만 쓰는 경우).
+- **근거** ([Cloudflare Pages: Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/), 2026-10-24): DNS 가 Cloudflare 에 없어도 서브도메인에 CNAME(`<sub>` → `<project>.pages.dev`)을 직접 만들면 되며, Pages 에서 도메인을 **먼저 추가**하지 않으면 522 오류. CAA 가 있으면 인증서 발급 기관 허용 필요. `*.pages.dev` 는 기본으로 열려 있어 끄거나 리다이렉트해야 출처가 하나로 유지된다.
+- **한도** ([Pages Limits](https://developers.cloudflare.com/pages/platform/limits/), 2026-10-24): 무료 플랜 빌드 월 500회, 사이트당 파일 20,000개, 파일당 25 MiB. 해당 페이지에는 대역폭·정적 요청 한도 언급이 없다(미확인).
+- **PWA/인증과의 관계**: 설치 정체성·저장소·로그인 세션이 호스트 이름에 묶이므로 서브도메인은 한 번 정하면 바꾸지 않는다. 인증 리다이렉트 URL 은 `https://<APP_HOST>/auth/callback` 한 줄만 허용 목록에 둔다(deployment.md §3).
+- **대안**: Vercel Hobby(개인 용도 무료지만 약관·한도는 **미확인**), Netlify, GitHub Pages. 정적 파일이라 이전 비용은 낮다. 이미 쓰는 호스팅이 있으면 그쪽에 같은 CNAME 방식으로 붙이면 된다.
+- **CI**: GitHub Actions(타입체크·린트·단위·RLS 테스트·비밀값 스캔)는 PR마다. 배포는 Pages 의 Git 연동에 맡긴다.
 
 ## D8. 오프라인(읽기 전용) 전략
 
@@ -159,5 +198,8 @@
 | iOS 홈 화면 앱과 Safari의 세션/저장소 분리 | 미확인 → 실기기 검증 |
 | Firebase, OpenAI, Vercel 요금·약관 | 조사 안 함(추천안에서 제외한 이유는 위에 명시) |
 | Cloudflare Pages 정적 대역폭 한도 | 공식 문서에 언급 없음(미확인) |
-| Haiku 5.5 한국어 품질(SC-003/004) | 구현 후 표본 평가로 확인, 미달 시 Sonnet 5.5 |
+| Sonnet 5.5 / Haiku 5.5 한국어 품질(SC-003/004) | 구현 후 표본 평가로 확인. Sonnet 이 기본이며, Haiku 도 통과하면 비용 절감용으로 내릴 수 있음 |
+| Max 구독 월 $100 API 크레딧의 정확한 조건(적용 범위, 이월 없음, 소진 후 동작) | 2차 출처만 확인 → 캡틴이 Console 에서 확인 |
+| 크레딧 키의 데이터 처리가 상업용 API 약관 경로인지 | 미확인 → 캡틴이 Console 설정에서 확인 |
+| Cloudflare Pages 인증서·HTTPS 리다이렉트·SPA 폴백 동작 | 첫 배포에서 확인 |
 | TanStack Query 장기(수 주) 오프라인 캐시 보존 | 구현 단계에서 검증 |

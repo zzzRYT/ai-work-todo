@@ -4,6 +4,7 @@
 
 저장소는 Postgres(Supabase)입니다. 아래는 **논리 모델**이며 실제 마이그레이션 SQL은 구현 단계(tasks)에서 만듭니다.
 모든 테이블은 `user_id`를 갖고 **행 수준 보안(RLS)** 으로 `user_id = auth.uid()` 인 행만 읽고 쓸 수 있습니다(FR-027).
+캡틴 1명 전용이라 실제 사용자는 하나지만, DB 가 인터넷에서 닿는 주소이므로 RLS 는 유지합니다(plan.md의 "변경된 가정" 참고).
 공통 열: `id uuid`(클라이언트가 생성 가능), `created_at`, `updated_at`(서버 트리거가 갱신, 충돌 시 마지막 수정 우선).
 
 ## 관계 개요
@@ -143,12 +144,13 @@ auth.users 1─* ai_requests ── (apply 시) ── tasks.ai_request_id
 | result_json | jsonb null | 사용자가 확정한 최종 결과 요약 |
 | model | text | 사용한 모델 이름 |
 | tokens_in, tokens_out | int null | 사용량 |
+| cost_micro_usd | bigint null | 서버가 토큰 수 × 가격 설정으로 계산한 추정 비용(1/1,000,000 달러). 월 예산 상한 판단과 사용량 표시에 사용 |
 | error_code | text null | 실패 사유 |
 | idempotency_key | text | `UNIQUE (user_id, idempotency_key)` — 더블 클릭/재시도에 중복 과금 방지 |
 | expires_at | timestamptz | 제안 만료(생성 후 24시간). 만료된 제안은 확정 불가 |
 
 - 확정 전까지 tasks 에는 아무 영향이 없다(FR-012). 확정은 RPC 한 번에 원자적으로 수행([contracts/data-api.md](./contracts/data-api.md)).
-- 일일 쿼터 계산은 `created_at` 으로 이 테이블을 센다. `input_text` 등은 지우더라도 **행(사용량)** 은 유지한다.
+- 일일 요청 수와 이번 달 지출(`SUM(cost_micro_usd)`)은 이 테이블로 센다(앱 전체 기준 — 1인 전용이라 사용자별 쿼터 설정은 없음). `input_text` 등은 지우더라도 **행(사용량)** 은 유지한다.
 - 인덱스: `(user_id, created_at)`.
 
 ## 유효성·제약 요약

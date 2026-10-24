@@ -9,7 +9,7 @@
 
 - Node.js LTS, 패키지 매니저(npm), Docker(Supabase 로컬 스택용), Supabase CLI
 - AI 실제 호출을 확인하려면 AI 제공자 API 키(**로컬 환경 변수 파일에만**, 커밋 금지)
-- 변수 이름은 `.env.example` 참고 — 값은 저장소에 없다. 필요한 이름: `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_ENABLED`, `AI_DAILY_REQUEST_LIMIT`, `AI_MAX_INPUT_CHARS`, `PLAN_POOL_MAX`, `AI_CONSENT_VERSION`, 프론트엔드용 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- 변수 이름은 `.env.example` 참고 — 값은 저장소에 없다. 필요한 이름: 서버 비밀값 `ANTHROPIC_API_KEY`(Supabase Edge Function Secrets / 로컬은 gitignore 된 `supabase/functions/.env`), 서버 설정 `AI_MODEL`, `AI_ENABLED`, `AI_DAILY_REQUEST_LIMIT`, `AI_MONTHLY_BUDGET_USD`, `AI_PRICE_IN_PER_MTOK`, `AI_PRICE_OUT_PER_MTOK`, `AI_MAX_INPUT_CHARS`, `PLAN_POOL_MAX`, `AI_CONSENT_VERSION`, `ALLOWED_ORIGIN`, 프론트엔드 공개 값 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. **키 값은 채팅·PR·저장소에 붙여 넣지 않는다.**
 
 ## 로컬 실행 (목표 형태)
 
@@ -56,9 +56,13 @@ AI 계약 테스트(가짜 제공자)는 위 단위 테스트에 포함된다([c
 | 16 | 설정에서 내보내기 → JSON 확인, 계정 삭제 → 로그인·데이터 전부 사라짐 | 형식은 [data-model.md](./data-model.md#내보내기-형식-fr-030) | FR-030 |
 | 17 | 다른 계정으로 로그인해 첫 계정의 행 id 로 직접 조회/수정 시도 | 모두 거부(RLS) | FR-027 |
 | 18 | 로그아웃 | 기기 캐시(IndexedDB) 삭제 | 개인정보 |
+| 19 | 월 예산 상한 시험: `AI_MONTHLY_BUDGET_USD` 를 아주 작게 두고 호출 | 상한 도달 후 AI 만 `monthly_budget_exceeded` 로 막히고 할 일·미팅 기능은 정상, 다음 달 재개 안내 | 비용 통제, SC-010 |
+| 20 | 비밀값 점검: 빌드 산출물(`dist`)과 저장소 이력에서 키 패턴 검색, 브라우저 네트워크 탭에서 AI 제공자 도메인으로 가는 요청 확인, 함수 로그 확인 | 키 패턴 0건, 브라우저는 AI 제공자에게 직접 요청하지 않음, 로그에 본문·헤더 없음 | 헌법 V, 개인정보 |
+| 21 | 운영 주소 점검: `https://<APP_HOST>` | HTTPS 자물쇠, HTTP→HTTPS, `*.pages.dev` 차단/리다이렉트, 새로고침 시 SPA 경로 정상, 인증 리다이렉트가 허용 URL 로만 동작, 매니페스트 scope/start_url 이 `/` | [deployment.md](./deployment.md) |
+| 22 | 홈 화면 추가한 앱에서 로그인(이메일 코드) → 앱을 닫고 다시 열기 | 설치 앱 안에서 세션 유지, 코드 입력 흐름이 설치 앱 안에서 끝남 | FR-025, FR-026 |
 
 ## 완료 기준 (이 계획 → 구현)
 
 - 위 자동 검증이 모두 통과한다.
-- 시나리오 1~18을 실행한 결과가 PR 설명에 기록된다.
-- 계획의 가정 중 확인되지 않은 것(iOS 세션 분리, 장기 오프라인 캐시, Haiku 5.5 한국어 품질)의 결과가 [research.md](./research.md) 의 미해결 표에 반영된다.
+- 시나리오 1~22를 실행한 결과가 PR 설명에 기록된다.
+- 계획의 가정 중 확인되지 않은 것(iOS 세션 분리, 장기 오프라인 캐시, AI 모델(Sonnet/Haiku 5.5) 한국어 품질)의 결과가 [research.md](./research.md) 의 미해결 표에 반영된다.

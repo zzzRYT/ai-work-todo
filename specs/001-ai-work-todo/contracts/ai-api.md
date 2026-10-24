@@ -11,9 +11,9 @@ AI는 **제안만** 만듭니다. 이 함수는 `tasks` 를 만들거나 바꾸�
 - **인증**: `Authorization: Bearer <사용자 JWT>` 필수(함수가 JWT 검증). 인증 정보로 `user_id` 를 얻으며 본문의 사용자 식별자는 신뢰하지 않는다.
 - **헤더**: `Idempotency-Key: <클라이언트 UUID>` 필수. 같은 키의 재요청은 새로 과금하지 않고 기존 `ai_requests` 의 결과를 돌려준다.
 - **서버가 정하는 값**: "오늘" 날짜와 요일은 서버 시각 + `profiles.timezone` 으로 계산한다(클라이언트가 보낸 날짜를 쓰지 않는다 → FR-011, SC-004).
-- **요청 순서(서버)**: ① JWT 검증 → ② 동의 확인 → ③ 입력 검증(길이) → ④ 쿼터 확인 → ⑤ 컨텍스트 조립 → ⑥ 제공자 호출(타임아웃 25초) → ⑦ 응답 검증/정제 → ⑧ `ai_requests` 저장 → ⑨ 응답.
-- **로깅 금지**: 요청 본문, 입력 원문, 프롬프트, 모델 응답을 함수 로그에 남기지 않는다. 로그는 `request_id`, `kind`, 상태, 토큰 수, 지연 시간만.
-- **응답 공통 필드**: `request_id`(uuid), `expires_at`(ISO 시각), `usage`(`{ remaining_today: int }`).
+- **요청 순서(서버)**: ① JWT 검증 → ② 동의 확인 → ③ 입력 검증(길이) → ④ 일일 요청 상한·**월 예산 상한** 확인 → ⑤ 컨텍스트 조립 → ⑥ 제공자 호출(타임아웃 25초) → ⑦ 응답 검증/정제 → ⑧ `ai_requests` 저장(토큰 수와 추정 비용 포함) → ⑨ 응답.
+- **로깅 금지**: 요청 본문, 입력 원문, 프롬프트, 모델 응답, **요청/응답 헤더(특히 제공자 `x-api-key`와 `Authorization`)** 를 함수 로그에 남기지 않는다. 제공자 SDK 의 디버그 로그도 끈다. 로그는 `request_id`, `kind`, 상태, 토큰 수, 지연 시간만.
+- **응답 공통 필드**: `request_id`(uuid), `expires_at`(ISO 시각), `usage`(`{ remaining_today: int, month_used_pct: int }` — 이번 달 앱 예산 대비 사용 %; 금액 자체는 설정 화면에서만 조회).
 
 ## POST /ai/organize — 러프한 문장 → 할 일 후보 (FR-009~FR-011, FR-015)
 
@@ -114,6 +114,8 @@ AI는 **제안만** 만듭니다. 이 함수는 `tasks` 를 만들거나 바꾸�
 | 404 | `task_not_found` | refine 대상 없음 | 목록 새로고침 |
 | 413 | `input_too_long` | 입력 상한 초과 | 줄이도록 안내(원문 유지) |
 | 429 | `quota_exceeded` | 일일 요청 한도 초과 | 남은 한도 0 표시, 직접 추가 안내. 응답에 `reset_at` |
+| 429 | `monthly_budget_exceeded` | 이번 달 앱 예산 상한(`AI_MONTHLY_BUDGET_USD`) 도달 | AI 만 비활성 + "이번 달 AI 예산을 다 썼어요", 직접 추가 안내. 응답에 `reset_at`(다음 달 1일) |
+| 503 | `provider_budget_exhausted` | 제공자 쪽 지출 한도·크레딧 소진(제공자가 400 `You have reached your specified … usage limits` 또는 429 `enforced_spend_limit_reached` 반환) | `monthly_budget_exceeded` 와 같은 UI. 재시도 무의미(`retryable: false`) |
 | 502 | `provider_error` | 제공자 오류/거절(`refusal`)/스키마 불일치(1회 재시도 후) | "다시 시도" + 직접 추가, `retryable: true` |
 | 504 | `provider_timeout` | 25초 초과 | 위와 동일 |
 | 503 | `ai_disabled` | 서버 설정에서 AI 꺼짐(킬 스위치) | AI 버튼 비활성 + 안내 |
@@ -122,14 +124,17 @@ AI는 **제안만** 만듭니다. 이 함수는 `tasks` 를 만들거나 바꾸�
 
 ## 서버 환경 변수 (이름만; 값은 저장소에 두지 않음)
 
-`ANTHROPIC_API_KEY`(비밀), `AI_MODEL`(기본 `claude-haiku-5-5`), `AI_ENABLED`, `AI_DAILY_REQUEST_LIMIT`(기본 30), `AI_MAX_INPUT_CHARS`(기본 4000), `PLAN_POOL_MAX`(기본 80), `AI_CONSENT_VERSION`(현재 고지 버전). `SUPABASE_URL`, `SUPABASE_ANON_KEY` 는 Supabase 가 주입.
+- **비밀값**(Supabase Edge Function Secrets 에만 저장, 저장소·로그·브라우저에 없음): `ANTHROPIC_API_KEY`.
+- **설정값**: `AI_MODEL`(기본 `claude-sonnet-5-5`, `claude-haiku-5-5` 로 교체 가능), `AI_ENABLED`, `AI_DAILY_REQUEST_LIMIT`(기본 40), `AI_MONTHLY_BUDGET_USD`(기본 20), `AI_PRICE_IN_PER_MTOK` / `AI_PRICE_OUT_PER_MTOK`(비용 계산용, 모델 가격표 값; 기본 Sonnet 5.5 기준 2 / 10), `AI_MAX_INPUT_CHARS`(기본 4000), `PLAN_POOL_MAX`(기본 80), `AI_CONSENT_VERSION`(현재 고지 버전), `ALLOWED_ORIGIN`(CORS 허용 출처 = `https://<APP_HOST>` 한 곳).
+- `SUPABASE_URL` 등 `SUPABASE_` 접두 변수는 Supabase 가 주입한다. 값은 이 저장소에 두지 않는다 — 이름만 `.env.example` 에 둔다.
 
 ## 계약 테스트 항목 (구현 시 자동화)
 
 1. 동의 없는 사용자 → 403, 제공자 호출 0회.
-2. 쿼터 초과 → 429, 제공자 호출 0회.
+2. 일일 상한 또는 월 예산 상한 초과 → 429, 제공자 호출 0회.
+   (추가) 제공자가 지출 한도 오류를 주면 `provider_budget_exhausted` 로 매핑.
 3. 가짜 제공자가 스키마에 어긋난 JSON 을 주면 1회 재시도 후 502.
 4. `explicit` + 원문에 없는 `due_quote` → `inferred` 로 강등.
 5. plan-today 에서 풀에 없는 `ref` 제거, 서버가 UUID 를 모델 요청에 넣지 않음.
-6. 요청/응답 본문이 로그로 출력되지 않음.
+6. 요청/응답 본문과 헤더(키 포함)가 로그로 출력되지 않음.
 7. 같은 `Idempotency-Key` 재요청 시 제공자 호출 1회.
