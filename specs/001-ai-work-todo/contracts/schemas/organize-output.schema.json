@@ -1,0 +1,54 @@
+{
+  "$comment": "Model-facing output schema for POST /ai/organize. Uses only the structured-outputs subset: no minLength/maxLength/pattern, additionalProperties:false. Empty string means 'no value'; the server converts it to null before replying to the client and validates formats itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates", "no_task_reason"],
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "description": "One entry per distinct task found in the user's text. Empty array if none.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "description", "subtasks", "list", "due_date", "due_basis", "due_quote"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Short, clean task title in Korean, imperative or noun phrase, at most about 60 characters. Keep names and terms from the user's text."
+          },
+          "description": {
+            "type": "string",
+            "description": "Extra context from the user's text only. Empty string if there is nothing to add. Never invent details."
+          },
+          "subtasks": {
+            "type": "array",
+            "description": "Concrete steps only if the user's text states or clearly implies them. Usually empty.",
+            "items": { "type": "string" }
+          },
+          "list": {
+            "type": "string",
+            "enum": ["today", "tomorrow", "backlog", "unspecified"],
+            "description": "Target list only if the text says when it should be worked on. Otherwise 'unspecified'."
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Deadline as YYYY-MM-DD resolved against the provided current date and timezone. Empty string if the text gives no deadline."
+          },
+          "due_basis": {
+            "type": "string",
+            "enum": ["explicit", "inferred", "none"],
+            "description": "'explicit' if the text states the deadline (e.g. '금요일까지'); 'inferred' if you are guessing from weak hints; 'none' if due_date is empty."
+          },
+          "due_quote": {
+            "type": "string",
+            "description": "The exact phrase copied from the user's text that gives the deadline. Empty string if due_basis is 'none'."
+          }
+        }
+      }
+    },
+    "no_task_reason": {
+      "type": "string",
+      "description": "If candidates is empty, a one-sentence Korean explanation for the user (e.g. what was unclear). Otherwise an empty string."
+    }
+  }
+}
