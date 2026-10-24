@@ -1,50 +1,47 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# AI Work Todo Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Spec Is the Source of Truth
+Every plan, task, and line of code traces back to a requirement in `specs/<feature>/spec.md`.
+A plan or implementation never silently changes a requirement; a gap found while planning is
+recorded and raised, and the spec is amended through the spec workflow.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Small, Boring, Low-Cost
+This is a personal side project. Prefer well-supported, widely used tools and managed services
+with a free or near-free tier. Add a component, service, or abstraction only when a current
+requirement needs it; every addition is justified in the plan's Complexity Tracking.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Private by Default, User in Control
+User data is visible only to its owner. Work information leaves the system for an AI provider only
+on an explicit user request and after the user has been told what is sent. AI output is always a
+proposal: nothing is created, moved, or deleted until the user confirms it.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Independently Testable Increments
+Each user story is deliverable and verifiable on its own, in priority order. Data-access rules and
+AI output contracts are covered by automated tests; the app stays fully usable when AI is down.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Public Repository Hygiene
+The repository is public. No secrets, keys, tokens, personal data, or private local paths are
+committed; configuration is by environment variables and a documented example file.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Additional Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Technology choices are written down with the alternatives considered, so they can be overruled.
+- Third-party service limits and prices cited in a plan carry a source and a date.
+- Visual and screen design is a separate step from the technical plan.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- Work flows spec → plan → tasks → implementation, one reviewed pull request per step.
+- Commits follow Conventional Commits.
+- A pull request states which spec requirements it covers and any open decisions.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution is deliberately short. It is amended by a pull request that explains the change;
+the version follows semantic versioning (MAJOR: principle removed or redefined, MINOR: principle or
+section added, PATCH: wording). Plans check themselves against it, and reviewers may ask for a
+justification in Complexity Tracking when a principle is bent.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-10-24 | **Last Amended**: 2026-10-24
